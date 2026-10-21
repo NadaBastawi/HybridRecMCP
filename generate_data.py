@@ -1,233 +1,195 @@
-"""
-TORCO Pest Control — Synthetic Data Generator
-Generates realistic customer, property, service, and interaction data
-based on real-world pest control patterns in Tucson, AZ / Southwest US
-"""
+"""Reproducible synthetic bookings; every rule and price is illustrative."""
 
-import os
-from pathlib import Path
-import pandas as pd
-import numpy as np
-from faker import Faker
-import random
+import argparse
 import json
-from datetime import datetime, timedelta
+from pathlib import Path
 
-fake = Faker()
-np.random.seed(42)
-random.seed(42)
+import numpy as np
+import pandas as pd
 
-# ── DOMAIN CONSTANTS ──────────────────────────────────────────────────────────
+from domain import (
+    PROPERTY_TYPES,
+    REGIONS,
+    build_profile,
+    eligible,
+    profile_prior,
+    rule_urgency,
+    season_for_month,
+)
 
+SEED = 42
+WINDOW_START = pd.Timestamp("2023-01-01")
+WINDOW_END = pd.Timestamp("2025-12-31")
 SERVICES = {
-    "S01": {"name": "General Pest Control",        "price": 120, "category": "general"},
-    "S02": {"name": "Termite Inspection",           "price": 150, "category": "termite"},
-    "S03": {"name": "Termite Treatment",            "price": 800, "category": "termite"},
-    "S04": {"name": "Bed Bug Treatment",            "price": 400, "category": "bed_bug"},
-    "S05": {"name": "Rodent Control",               "price": 200, "category": "rodent"},
-    "S06": {"name": "Scorpion Control",             "price": 180, "category": "scorpion"},
-    "S07": {"name": "Ant & Cockroach Treatment",    "price": 130, "category": "ant_roach"},
-    "S08": {"name": "Commercial Pest Management",   "price": 500, "category": "commercial"},
-    "S09": {"name": "Preventive Maintenance Plan",  "price": 300, "category": "preventive"},
-    "S10": {"name": "Emergency Pest Response",      "price": 250, "category": "emergency"},
+    "S01": ("General Pest Control", 120, "general"),
+    "S02": ("Termite Inspection", 150, "termite"),
+    "S03": ("Termite Treatment Consultation", 800, "termite"),
+    "S04": ("Bed Bug Assessment", 400, "bed_bug"),
+    "S05": ("Rodent Control Consultation", 200, "rodent"),
+    "S06": ("Scorpion Control Consultation", 180, "scorpion"),
+    "S07": ("Ant & Cockroach Consultation", 130, "ant_roach"),
+    "S08": ("Commercial Pest Management", 500, "commercial"),
+    "S09": ("Preventive Maintenance Plan", 300, "preventive"),
+    "S10": ("Priority Inspection Request", 250, "emergency"),
 }
-
-PROPERTY_TYPES = ["residential_house", "residential_apartment", "commercial_restaurant",
-                  "commercial_office", "commercial_warehouse", "mobile_home"]
-
-TUCSON_ZIP_CODES = ["85701", "85704", "85705", "85706", "85710",
-                    "85711", "85712", "85713", "85714", "85715",
-                    "85716", "85718", "85719", "85730", "85741",
-                    "85742", "85743", "85745", "85746", "85747"]
-
-# Desert-adjacent zips (higher scorpion/ant risk)
-DESERT_ADJACENT = ["85743", "85745", "85741", "85742", "85718", "85704"]
-
-# Older neighborhoods (higher termite risk)
-OLDER_NEIGHBORHOODS = ["85701", "85705", "85706", "85713", "85716", "85719"]
-
-SEASONS = {1: "winter", 2: "winter", 3: "spring", 4: "spring", 5: "spring",
-           6: "summer", 7: "summer", 8: "summer", 9: "fall", 10: "fall",
-           11: "fall", 12: "winter"}
-
-# ── RISK PROFILES ─────────────────────────────────────────────────────────────
-
-def get_service_probabilities(property_type, zip_code, season, building_age, prev_services):
-    """
-    Compute realistic service probabilities based on domain knowledge:
-    - Termites peak in spring/summer in Tucson
-    - Scorpions are desert-adjacent problem
-    - Commercial properties have higher rodent risk
-    - Older buildings have higher termite risk
-    - Bed bugs are apartment/hotel problem
-    """
-    probs = {sid: 0.05 for sid in SERVICES}  # base probability
-
-    is_desert = zip_code in DESERT_ADJACENT
-    is_old = zip_code in OLDER_NEIGHBORHOODS or building_age > 20
-    is_commercial = "commercial" in property_type
-    is_apartment = property_type == "residential_apartment"
-    is_restaurant = property_type == "commercial_restaurant"
-    is_warehouse = property_type == "commercial_warehouse"
-
-    # General pest control — universal baseline
-    probs["S01"] = 0.35 if not is_commercial else 0.15
-
-    # Termite — peaks spring/summer, higher in older/desert areas
-    termite_base = 0.10
-    if season in ["spring", "summer"]: termite_base += 0.15
-    if is_old: termite_base += 0.15
-    if is_desert: termite_base += 0.05
-    probs["S02"] = termite_base
-    probs["S03"] = termite_base * 0.6  # treatment less common than inspection
-
-    # Bed bugs — apartments and commercial lodging
-    probs["S04"] = 0.20 if is_apartment else 0.05
-
-    # Rodents — commercial, warehouses, restaurants
-    probs["S05"] = 0.30 if is_restaurant else (0.25 if is_warehouse else 0.08)
-
-    # Scorpions — desert adjacent, residential
-    probs["S06"] = 0.30 if (is_desert and not is_commercial) else 0.05
-
-    # Ants/cockroaches — restaurants and apartments
-    probs["S07"] = 0.30 if is_restaurant else (0.20 if is_apartment else 0.10)
-
-    # Commercial management — commercial only
-    probs["S08"] = 0.40 if is_commercial else 0.02
-
-    # Preventive plan — higher if had issues before
-    probs["S09"] = 0.25 if len(prev_services) > 2 else 0.10
-
-    # Emergency — rare but spikes in summer
-    probs["S10"] = 0.10 if season == "summer" else 0.03
-
-    # Boost probability if customer had related service before (repeat patterns)
-    if "S02" in prev_services: probs["S03"] += 0.20  # inspection → treatment
-    if "S03" in prev_services: probs["S09"] += 0.15  # treatment → preventive plan
-    if "S01" in prev_services: probs["S09"] += 0.10  # general → preventive
-
-    # Normalize
-    total = sum(probs.values())
-    return {k: v / total for k, v in probs.items()}
-
-
-def get_urgency(service_id, season, building_age, days_since_last_service):
-    """Predict urgency score 1-10 based on context"""
-    base = 5
-    if service_id in ["S03", "S04", "S10"]: base = 7  # high risk services
-    if season == "summer" and service_id in ["S02", "S03", "S06"]: base += 2
-    if building_age > 30 and service_id in ["S02", "S03"]: base += 1
-    if days_since_last_service > 365: base += 1
-    if days_since_last_service > 730: base += 2
-    return min(10, max(1, base + random.randint(-1, 1)))
-
-
-# ── GENERATORS ────────────────────────────────────────────────────────────────
-
-def generate_customers(n=500):
-    customers = []
-    for i in range(n):
-        zip_code = random.choice(TUCSON_ZIP_CODES)
-        prop_type = random.choices(
-            PROPERTY_TYPES,
-            weights=[0.40, 0.20, 0.12, 0.12, 0.08, 0.08]
-        )[0]
-        building_age = random.randint(1, 50)
-        customers.append({
-            "customer_id": f"C{str(i+1).zfill(4)}",
-            "name": fake.name(),
-            "email": fake.email(),
-            "zip_code": zip_code,
-            "property_type": prop_type,
-            "building_age_years": building_age,
-            "is_desert_adjacent": zip_code in DESERT_ADJACENT,
-            "is_older_neighborhood": zip_code in OLDER_NEIGHBORHOODS,
-            "is_commercial": "commercial" in prop_type,
-            "member_since": fake.date_between(start_date="-5y", end_date="-6m").isoformat(),
-            "num_units": random.randint(1, 50) if prop_type in ["residential_apartment", "commercial_warehouse"] else 1,
-        })
-    return pd.DataFrame(customers)
-
-
-def generate_interactions(customers_df, n_interactions=3000):
-    interactions = []
-    for _ in range(n_interactions):
-        customer = customers_df.sample(1).iloc[0]
-        date = fake.date_between(start_date="-3y", end_date="today")
-        season = SEASONS[date.month]
-
-        # Get previous services for this customer
-        prev = [r["service_id"] for r in interactions if r["customer_id"] == customer["customer_id"]]
-
-        probs = get_service_probabilities(
-            customer["property_type"],
-            customer["zip_code"],
-            season,
-            customer["building_age_years"],
-            prev
-        )
-
-        service_id = random.choices(list(probs.keys()), weights=list(probs.values()))[0]
-        days_since = random.randint(30, 730)
-        urgency = get_urgency(service_id, season, customer["building_age_years"], days_since)
-        rating = max(1, min(5, round(random.gauss(4.1, 0.8))))
-
-        interactions.append({
-            "interaction_id": f"I{str(len(interactions)+1).zfill(5)}",
-            "customer_id": customer["customer_id"],
-            "service_id": service_id,
-            "service_name": SERVICES[service_id]["name"],
-            "date": date.isoformat(),
-            "season": season,
-            "rating": rating,
-            "urgency_score": urgency,
-            "days_since_last_service": days_since,
-            "completed": random.choices([True, False], weights=[0.92, 0.08])[0],
-            "repeat_booking": service_id in prev,
-        })
-
-    return pd.DataFrame(interactions)
 
 
 def generate_services_df():
+    return pd.DataFrame(
+        [
+            dict(
+                service_id=sid,
+                service_name=name,
+                price_usd=price,
+                category=category,
+                suitable_residential=category != "commercial",
+                suitable_commercial=True,
+                peak_season="illustrative seasonal"
+                if category in ("termite", "scorpion")
+                else "year-round",
+            )
+            for sid, (name, price, category) in SERVICES.items()
+        ]
+    )
+
+
+def generate_customers(n=500, region="tucson", seed=SEED):
+    if n < 1 or region not in (*REGIONS, "both"):
+        raise ValueError("Positive customer count and supported region required")
+    rng = np.random.default_rng(seed)
     rows = []
-    for sid, info in SERVICES.items():
-        rows.append({
-            "service_id": sid,
-            "service_name": info["name"],
-            "price_usd": info["price"],
-            "category": info["category"],
-            "suitable_residential": info["category"] not in ["commercial"],
-            "suitable_commercial": info["category"] in ["commercial", "rodent", "ant_roach", "general", "preventive", "emergency"],
-            "peak_season": "spring-summer" if info["category"] in ["termite", "scorpion"] else "year-round",
-        })
+    for i in range(n):
+        selected = ("ohio" if i % 4 == 3 else "tucson") if region == "both" else region
+        prop = str(rng.choice(PROPERTY_TYPES, p=[0.4, 0.2, 0.12, 0.12, 0.08, 0.08]))
+        profile = build_profile(
+            prop,
+            str(rng.choice(REGIONS[selected]["example_zips"])),
+            int(rng.integers(1, 81)),
+            selected,
+        )
+        rows.append(
+            dict(
+                customer_id=f"C{i + 1:04d}",
+                **profile,
+                member_since=(WINDOW_START - pd.Timedelta(days=int(rng.integers(1, 730))))
+                .date()
+                .isoformat(),
+                num_units=int(rng.integers(1, 51)) if prop == "residential_apartment" else 1,
+            )
+        )
     return pd.DataFrame(rows)
 
 
-# ── MAIN ──────────────────────────────────────────────────────────────────────
+def get_service_probabilities(
+    property_type, zip_code, season, building_age, prev_services, region="tucson"
+):
+    profile = build_profile(property_type, str(zip_code), building_age, region)
+    catalog = generate_services_df().set_index("service_id").to_dict("index")
+    probabilities = {}
+    for sid, info in catalog.items():
+        weight = profile_prior(profile, sid, season) if eligible(info, profile) else 0.0
+        if sid == "S09" and len(prev_services) >= 3:
+            weight += 0.12
+        probabilities[sid] = weight
+    total = sum(probabilities.values())
+    return {sid: value / total for sid, value in probabilities.items()}
+
+
+def get_urgency(
+    service_id, season, building_age, days_since_last_service, region="tucson", rng=None
+):
+    rng = rng if rng is not None else np.random.default_rng(SEED)
+    target = rule_urgency(service_id, season, building_age, days_since_last_service, region)
+    return int(np.clip(target + rng.integers(-1, 2), 1, 10))
+
+
+def generate_interactions(customers_df, n_interactions=3000, seed=SEED):
+    if n_interactions < len(customers_df) or customers_df.empty:
+        raise ValueError("At least one interaction per customer is required")
+    rng = np.random.default_rng(seed)
+    counts = np.full(len(customers_df), n_interactions // len(customers_df))
+    counts[: n_interactions % len(customers_df)] += 1
+    rows = []
+    window = (WINDOW_END - WINDOW_START).days + 1
+    for (_, customer), count in zip(customers_df.iterrows(), counts, strict=True):
+        if count > window:
+            raise ValueError("Too many visits for fixed daily observation window")
+        dates = sorted(rng.choice(window, size=count, replace=False))
+        previous = []
+        last_date = pd.Timestamp(customer["member_since"])
+        for offset in dates:
+            date = WINDOW_START + pd.Timedelta(days=int(offset))
+            season = season_for_month(date.month)
+            probs = get_service_probabilities(
+                customer["property_type"],
+                customer["zip_code"],
+                season,
+                customer["building_age_years"],
+                previous,
+                customer["region"],
+            )
+            sid = str(rng.choice(list(probs), p=list(probs.values())))
+            days = int((date - last_date).days)
+            rows.append(
+                dict(
+                    customer_id=customer["customer_id"],
+                    service_id=sid,
+                    service_name=SERVICES[sid][0],
+                    date=date.date().isoformat(),
+                    season=season,
+                    rating=int(np.clip(round(rng.normal(4.1, 0.8)), 1, 5)),
+                    urgency_score=get_urgency(
+                        sid, season, customer["building_age_years"], days, customer["region"], rng
+                    ),
+                    days_since_last_service=days,
+                    completed=True,
+                    repeat_booking=sid in previous,
+                )
+            )
+            previous.append(sid)
+            last_date = date
+    result = (
+        pd.DataFrame(rows)
+        .sort_values(["date", "customer_id"], kind="stable")
+        .reset_index(drop=True)
+    )
+    result.insert(0, "interaction_id", [f"I{i + 1:05d}" for i in range(len(result))])
+    return result
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--region", choices=[*REGIONS, "both"], default="both")
+    parser.add_argument("--seed", type=int, default=SEED)
+    parser.add_argument("--output-dir", type=Path, default=Path(__file__).parent / "data")
+    args = parser.parse_args()
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    customers = generate_customers(region=args.region, seed=args.seed)
+    interactions = generate_interactions(customers, seed=args.seed)
+    services = generate_services_df()
+    for name, frame in [
+        ("customers", customers),
+        ("interactions", interactions),
+        ("services", services),
+    ]:
+        frame.to_csv(args.output_dir / f"{name}.csv", index=False, lineterminator="\n")
+    manifest = dict(
+        synthetic=True,
+        seed=args.seed,
+        region=args.region,
+        observation_start="2023-01-01",
+        observation_end="2025-12-31",
+        customers=len(customers),
+        interactions=len(interactions),
+        services=len(services),
+        generator_version="2.0.0",
+        prices="illustrative, not company quotes",
+    )
+    (args.output_dir / "manifest.json").write_text(
+        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+    )
+    print(json.dumps(manifest, indent=2))
+
 
 if __name__ == "__main__":
-    output_dir = Path(__file__).resolve().parent / "data"
-    output_dir.mkdir(exist_ok=True)
-
-    print("Generating customers...")
-    customers = generate_customers(500)
-    customers.to_csv(output_dir / "customers.csv", index=False)
-    print(f"  ✓ {len(customers)} customers")
-
-    print("Generating interactions...")
-    interactions = generate_interactions(customers, 3000)
-    interactions.to_csv(output_dir / "interactions.csv", index=False)
-    print(f"  ✓ {len(interactions)} interactions")
-
-    print("Generating services catalog...")
-    services = generate_services_df()
-    services.to_csv(output_dir / "services.csv", index=False)
-    print(f"  ✓ {len(services)} services")
-
-    print("\nSample customer:")
-    print(customers.head(2).to_string())
-    print("\nSample interactions:")
-    print(interactions.head(3).to_string())
-    print(f"\nDone. Files saved in {output_dir}")
+    main()

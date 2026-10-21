@@ -1,0 +1,89 @@
+ M .dockerignore
+ M .env.example
+ M .github/workflows/ci.yml
+ M .github/workflows/main_hybridrecmcp.yml
+ M .gitignore
+ M Dockerfile
+ M LICENSE
+ M README.md
+ M TORCO_RecSys_Project_Plan.md
+ M data/customers.csv
+ M data/interactions.csv
+ M data/services.csv
+ M docs/model_card.md
+ M generate_data.py
+ M main.py
+ M monitoring/__init__.py
+ M monitoring/drift_detector.py
+ M monitoring/logger.py
+ M notebooks/01_eda.ipynb
+ M recommender.py
+ M requirements.txt
+ M server.py
+ M test_monitoring.py
+ M tests/conftest.py
+ M tests/test_api.py
+ M tests/test_data.py
+ M tests/test_recommender.py
+?? .gitattributes
+?? .streamlit/config.toml
+?? config/regions.json
+?? data/data_card.md
+?? data/manifest.json
+?? data_utils.py
+?? demo.py
+?? docs/api_reference.md
+?? docs/architecture.md
+?? docs/audit.md
+?? docs/business_proposal.md
+?? docs/cloud_readiness_report.md
+?? docs/demo_script.md
+?? docs/deployment.md
+?? docs/evaluation.md
+?? docs/mcp.md
+?? docs/public_demo_checklist.md
+?? docs/regional_assumptions.md
+?? docs/streamlit_deployment.md
+?? docs/validation_report.md
+?? domain.py
+?? evaluate.py
+?? explanations.py
+?? model_store.py
+?? monitoring/README.md
+?? pyproject.toml
+?? reports/cloud-demo-card.png
+?? reports/cloud-git-status.txt
+?? reports/cloud-readiness.json
+?? reports/cloud-tests.xml
+?? reports/demo-header.png
+?? reports/demo-result.png
+?? reports/evaluation.json
+?? reports/sample_response.json
+?? reports/streamlit_readiness.json
+?? reports/tests.xml
+?? reports/validation.json
+?? requirements-api.txt
+?? requirements-demo.in
+?? requirements-demo.lock
+?? requirements-demo.txt
+?? requirements-dev.in
+?? requirements-dev.lock
+?? requirements-dev.txt
+?? requirements.in
+?? requirements.lock
+?? schemas.py
+?? scripts/azure_start.sh
+?? scripts/check_backend_health.py
+?? scripts/check_notebook.py
+?? scripts/check_streamlit_readiness.py
+?? scripts/package_backend.py
+?? settings.py
+?? tests/test_demo.py
+?? tests/test_deployment.py
+?? tests/test_evaluation.py
+?? tests/test_explanations.py
+?? tests/test_generation.py
+?? tests/test_mcp.py
+?? tests/test_model_store.py
+?? tests/test_monitoring.py
+?? train.py

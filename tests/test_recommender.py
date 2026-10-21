@@ -1,200 +1,103 @@
-"""
-TORCO Recommendation System - Recommender Model Tests
+"""Model regressions, eligibility, cold start and reproducibility."""
 
-Tests for model functionality and prediction quality.
-"""
-
-import pytest
-import pandas as pd
 import numpy as np
-import sys
-import os
+import pytest
+from pydantic import ValidationError
 
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
+from domain import build_profile
 from recommender import HybridRecommender
 
 
-@pytest.fixture
-def recommender():
-    """Load and initialize the recommender model."""
-    model = HybridRecommender(cb_weight=0.4, cf_weight=0.6)
-    customers = pd.read_csv('data/customers.csv')
-    interactions = pd.read_csv('data/interactions.csv')
-    services = pd.read_csv('data/services.csv')
-    model.fit(customers, interactions, services)
-    return model
+@pytest.mark.parametrize("top_n", [1, 3, 5, 10])
+def test_existing_rankings(engine, top_n):
+    a = engine.recommend("C0001", top_n=top_n)
+    assert 0 < len(a) <= top_n
+    assert len({r["service_id"] for r in a}) == len(a)
+    assert [r["score"] for r in a] == sorted([r["score"] for r in a], reverse=True)
+    assert all(0 <= r["score"] <= 1 and 1 <= r["urgency_score"] <= 10 for r in a)
+    assert a == engine.recommend("C0001", top_n=top_n)
 
 
-@pytest.fixture
-def sample_data():
-    """Load sample data for testing."""
-    customers = pd.read_csv('data/customers.csv')
-    services = pd.read_csv('data/services.csv')
-    return customers, services
+@pytest.mark.parametrize(
+    "region,zip_code", [("tucson", "85743"), ("ohio", "43215"), ("tucson", "99999")]
+)
+@pytest.mark.parametrize("season", ["winter", "spring", "summer", "fall"])
+def test_cold_profiles(engine, region, zip_code, season):
+    recs = engine.recommend_cold_start(
+        "residential_house", zip_code, 30, season=season, top_n=10, region=region
+    )
+    assert recs and all(r["category"] != "commercial" for r in recs)
+    if region == "ohio":
+        assert all(r["category"] != "scorpion" for r in recs)
 
 
-class TestRecommenderModel:
-    """Test suite for the hybrid recommender model."""
-
-    def test_model_loads_successfully(self, recommender):
-        """Test that the model loads without errors."""
-        assert recommender is not None, "Model failed to load"
-        assert hasattr(recommender, 'recommend'), "Model missing recommend method"
-
-    def test_recommend_returns_top_n_results(self, recommender, sample_data):
-        """Test that recommend returns exactly top_n results."""
-        customers, _ = sample_data
-        test_customer = customers.iloc[0]
-        
-        for top_n in [1, 3, 5, 10]:
-            recommendations = recommender.recommend(
-                customer_id=test_customer['customer_id'],
-                top_n=top_n,
-                season='spring',
-                days_since_last=200
-            )
-            assert len(recommendations) <= top_n, \
-                f"Got {len(recommendations)} recommendations, expected <= {top_n}"
-
-    def test_recommend_handles_cold_start(self, recommender):
-        """Test that model handles new customers (cold-start)."""
-        # Use a valid property type but new zip code
-        recommendations = recommender.recommend_cold_start(
-            property_type='residential_house',
-            zip_code='99999',  # Non-existent ZIP
-            building_age_years=25,
-            season='summer',
-            days_since_last=180,
-            top_n=5
-        )
-        
-        assert len(recommendations) > 0, "Cold-start failed: no recommendations generated"
-        assert isinstance(recommendations, list), "Recommendations should be a list"
-
-    def test_recommendation_score_range(self, recommender, sample_data):
-        """Test that recommendation scores are in valid range."""
-        customers, _ = sample_data
-        test_customer = customers.iloc[0]
-        
-        recommendations = recommender.recommend(
-            customer_id=test_customer['customer_id'],
-            top_n=5,
-            season='spring',
-            days_since_last=200
-        )
-        
-        for rec in recommendations:
-            score = rec.get('score')
-            assert score is not None, "Recommendation missing score"
-            assert 0 <= score <= 1, f"Score out of range: {score}"
-
-    def test_urgency_score_range(self, recommender, sample_data):
-        """Test that urgency scores are in valid range [1, 10]."""
-        customers, _ = sample_data
-        test_customer = customers.iloc[0]
-        
-        recommendations = recommender.recommend(
-            customer_id=test_customer['customer_id'],
-            top_n=5,
-            season='spring',
-            days_since_last=200
-        )
-        
-        for rec in recommendations:
-            urgency = rec.get('urgency_score')
-            assert urgency is not None, "Recommendation missing urgency_score"
-            assert 1 <= urgency <= 10, f"Urgency score out of range: {urgency}"
-
-    def test_returned_service_ids_valid(self, recommender, sample_data):
-        """Test that all returned service IDs are valid."""
-        customers, services = sample_data
-        test_customer = customers.iloc[0]
-        valid_services = set(services['service_id'].unique())
-        
-        recommendations = recommender.recommend(
-            customer_id=test_customer['customer_id'],
-            top_n=5,
-            season='spring',
-            days_since_last=200
-        )
-        
-        for rec in recommendations:
-            service_id = rec.get('service_id')
-            assert service_id in valid_services, \
-                f"Invalid service ID in recommendations: {service_id}"
-
-    def test_recommendations_are_ordered_by_score(self, recommender, sample_data):
-        """Test that recommendations are ordered by score (descending)."""
-        customers, _ = sample_data
-        test_customer = customers.iloc[0]
-        
-        recommendations = recommender.recommend(
-            customer_id=test_customer['customer_id'],
-            top_n=5,
-            season='spring',
-            days_since_last=200
-        )
-        
-        if len(recommendations) > 1:
-            scores = [rec['score'] for rec in recommendations]
-            assert scores == sorted(scores, reverse=True), \
-                "Recommendations not ordered by score (descending)"
-
-    def test_no_duplicate_recommendations(self, recommender, sample_data):
-        """Test that no duplicate service IDs in recommendations."""
-        customers, _ = sample_data
-        test_customer = customers.iloc[0]
-        
-        recommendations = recommender.recommend(
-            customer_id=test_customer['customer_id'],
-            top_n=10,
-            season='spring',
-            days_since_last=200
-        )
-        
-        service_ids = [rec['service_id'] for rec in recommendations]
-        assert len(service_ids) == len(set(service_ids)), \
-            "Duplicate service IDs found in recommendations"
-
-    def test_recommend_with_all_seasons(self, recommender, sample_data):
-        """Test that recommender works for all seasons."""
-        customers, _ = sample_data
-        test_customer = customers.iloc[0]
-        
-        for season in ['winter', 'spring', 'summer', 'fall']:
-            recommendations = recommender.recommend(
-                customer_id=test_customer['customer_id'],
-                top_n=5,
-                season=season,
-                days_since_last=200
-            )
-            assert len(recommendations) > 0, f"Failed to recommend for season: {season}"
-
-    def test_model_deterministic(self, recommender, sample_data):
-        """Test that model produces consistent results (seed 42)."""
-        customers, _ = sample_data
-        test_customer = customers.iloc[0]
-        
-        rec1 = recommender.recommend(
-            customer_id=test_customer['customer_id'],
-            top_n=5,
-            season='spring',
-            days_since_last=200
-        )
-        
-        rec2 = recommender.recommend(
-            customer_id=test_customer['customer_id'],
-            top_n=5,
-            season='spring',
-            days_since_last=200
-        )
-        
-        assert len(rec1) == len(rec2), "Inconsistent number of recommendations"
-        for r1, r2 in zip(rec1, rec2):
-            assert r1['service_id'] == r2['service_id'], "Inconsistent recommendation order"
+def test_relevance_is_separate_from_urgency(engine):
+    a = engine.recommend_cold_start(
+        "residential_house", "85743", 45, season="winter", days_since_last=30
+    )
+    b = engine.recommend_cold_start(
+        "residential_house", "85743", 45, season="summer", days_since_last=900
+    )
+    assert [(r["service_id"], r["score"]) for r in a] == [(r["service_id"], r["score"]) for r in b]
+    assert any(x["urgency_score"] != y["urgency_score"] for x, y in zip(a, b, strict=True))
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+def test_profile_processing(engine):
+    cols = engine.cb.transformer.named_transformers_["category"].get_feature_names_out()
+    assert any("property_type_residential_house" in col for col in cols)
+    vector = engine.cb.score_profile(
+        {
+            **build_profile("residential_house", "85743", 30),
+            "property_type": "unseen_internal_category",
+        }
+    )
+    assert all(np.isfinite(list(vector.values())))
+    with pytest.raises(ValidationError):
+        engine.recommend_cold_start("castle", "85743", 30)
+    with pytest.raises(KeyError):
+        engine.recommend("C9999")
+
+
+def test_single_user_small_svd(dataset):
+    customers, interactions, services = dataset
+    one = customers.iloc[:1]
+    model = HybridRecommender().fit(
+        one, interactions[interactions.customer_id.isin(one.customer_id)], services
+    )
+    assert model.cf.effective_components == 1
+    assert model.recommend("C0001")
+
+
+def test_repeat_services_explicitly_allowed(engine, dataset):
+    cid = "C0001"
+    purchased = set(dataset[1].loc[dataset[1].customer_id == cid, "service_id"])
+    assert purchased
+    # All eligible services remain candidates even when the customer has history.
+    recommendations = engine.recommend(cid, top_n=10)
+    ids = {r["service_id"] for r in recommendations}
+    assert purchased <= ids
+    assert len(ids) == (10 if engine.customers_df.loc[cid, "is_commercial"] else 9)
+
+
+def test_training_excludes_unknown_users(dataset):
+    c, i, s = dataset
+    train = i[~i.customer_id.isin(c.customer_id.tail(5))]
+    model = HybridRecommender().fit(c, train, s)
+    assert not set(c.customer_id.tail(5)) & set(model.customers_df.index)
+    assert model.training_interaction_ids == set(train.interaction_id)
+
+
+def test_model_roundtrip(engine, tmp_path):
+    path = tmp_path / "model.pkl"
+    engine.save(path, {"test": "fingerprint"})
+    loaded = HybridRecommender.load(path, {"test": "fingerprint"})
+    assert loaded.recommend("C0001") == engine.recommend("C0001")
+    with pytest.raises(ValueError, match="Stale"):
+        HybridRecommender.load(path, {"test": "different"})
+
+
+def test_training_reproducible(dataset, engine):
+    from evaluate import fit_model
+
+    second = fit_model(*dataset)
+    assert second.recommend("C0001") == engine.recommend("C0001")

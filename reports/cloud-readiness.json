@@ -1,0 +1,111 @@
+{
+  "date": "2026-10-21",
+  "baseline_commit": "38e1cc43b78e4163d019fb278e105b9e22e4bfc6",
+  "branch": "main",
+  "python": "3.12.3",
+  "tests": {
+    "passed": 124,
+    "failed": 0,
+    "skipped": 0
+  },
+  "streamlit": {
+    "code_ready": true,
+    "locally_verified": true,
+    "published": false,
+    "publicly_verified": false
+  },
+  "azure": {
+    "workflow_dispatched": false,
+    "authentication_verified": false,
+    "hosted_verified": false
+  },
+  "preserved_sha256": {
+    "data/data_card.md": "4feb4345dae85aaa7730e93846ff787ed250af11b3522ce911f427a39e75580a",
+    "data/manifest.json": "9b0c0dca78a5579d9cf8acb851cf3d59cba1fe18a0c67e4e7d985ec680ae552c",
+    "docs/validation_report.md": "326266bf672ee0b352dcbfa346a374556d54d7bad3d5ac329dc7c366f0f2d563",
+    "domain.py": "625ea1fa75cb5db73bca8e89abd882d0805fe39d06e8814179919f665b71f96e",
+    "evaluate.py": "5bcd9d58745c160e98757e6ea478a852d90f58172dcb1fcc6bab5b3b2c5c6b32",
+    "reports/evaluation.json": "ab3b2119847b665b3d82e585787abda1fa1354cc3f424adab5b13baadf13a13a",
+    "data/customers.csv": "647314927b9f623e27cc440f7c556bcc6f2a49a70a799d88ad9827590c6aae5a",
+    "data/interactions.csv": "6106802e04724f5cd3e463fbc035cb69de00908d9fb1ba4fc58e0ef52d340037",
+    "data/services.csv": "6eb4343bede8bab2a578eec7c9dd39d18392955b9eb6b461c1a8bb7c61aee651",
+    "generate_data.py": "d13a6d57462acf3d55d296e1940525ebd9deb5e1df8a6adae9495dde67f19fa8"
+  },
+  "modified_this_phase": [
+    ".dockerignore",
+    ".github/workflows/ci.yml",
+    ".github/workflows/main_hybridrecmcp.yml",
+    ".gitignore",
+    ".streamlit/config.toml",
+    "Dockerfile",
+    "README.md",
+    "demo.py",
+    "docs/api_reference.md",
+    "docs/architecture.md",
+    "docs/demo_script.md",
+    "docs/deployment.md",
+    "docs/mcp.md",
+    "monitoring/logger.py",
+    "recommender.py",
+    "requirements.txt",
+    "schemas.py",
+    "scripts/azure_start.sh",
+    "server.py",
+    "tests/test_api.py",
+    "tests/test_demo.py",
+    "tests/test_mcp.py",
+    "train.py"
+  ],
+  "added_this_phase": [
+    "docs/cloud_readiness_report.md",
+    "docs/public_demo_checklist.md",
+    "docs/streamlit_deployment.md",
+    "explanations.py",
+    "model_store.py",
+    "reports/cloud-demo-card.png",
+    "reports/cloud-git-status.txt",
+    "reports/cloud-readiness.json",
+    "reports/cloud-tests.xml",
+    "reports/streamlit_readiness.json",
+    "requirements-api.txt",
+    "scripts/check_backend_health.py",
+    "scripts/check_streamlit_readiness.py",
+    "scripts/package_backend.py",
+    "tests/test_deployment.py",
+    "tests/test_explanations.py",
+    "tests/test_model_store.py"
+  ],
+  "git_status": {
+    "modified_tracked": 27,
+    "untracked": 62
+  },
+  "readiness": {
+    "python": "3.12.3",
+    "checks": [
+      {
+        "mode": "cold",
+        "initialization_seconds": 7.011,
+        "cached_rerun_seconds": 0.03,
+        "peak_memory_mib": 193.98,
+        "artifact_bytes": 404603,
+        "verified": true
+      },
+      {
+        "mode": "warm",
+        "initialization_seconds": 5.194,
+        "cached_rerun_seconds": 0.043,
+        "peak_memory_mib": 188.63,
+        "artifact_bytes": 404603,
+        "verified": true
+      },
+      {
+        "mode": "invalid",
+        "initialization_seconds": 6.363,
+        "cached_rerun_seconds": 0.066,
+        "peak_memory_mib": 193.07,
+        "artifact_bytes": 404603,
+        "verified": true
+      }
+    ]
+  }
+}

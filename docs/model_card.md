@@ -1,124 +1,73 @@
-# TORCO Pest Control Recommendation System - Model Card
+# Model card — HybridRecMCP 2.0
 
-## Model Details
+**Developer:** Nada Bastawi (GitHub repository commit evidence). Original documentation
+credited GitHub Copilot assistance; OpenAI Codex assisted this refactor and validation.
+**License:** MIT. **Status:** independent, unofficial synthetic-data proof of concept.
+Not commissioned, endorsed or integrated by a real pest-control company.
 
-**Model Name:** TORCO Hybrid Recommender  
-**Version:** 1.0.0  
-**Date:** May 8, 2026  
-**Authors:** AI Assistant (GitHub Copilot)  
-**License:** MIT  
+## Intended use
 
-### Model Description
-A hybrid recommendation system combining content-based filtering, collaborative filtering, and urgency scoring to recommend pest control services to customers in Tucson, Arizona. The system provides personalized service recommendations based on customer profiles, historical behavior, and contextual factors like season and time since last service.
+Local staff-workflow demonstrations, technical review and portfolio discussion.
+Suggest possible service conversations, never diagnose infestations, prescribe treatment,
+assess validated environmental/health risk or promise a service deadline. No automated
+customer outreach, booking or operational action is implemented.
 
-### Model Architecture
-- **Content-Based Filtering (40% weight):** Uses customer property features (type, age, location) and service affinity vectors
-- **Collaborative Filtering (60% weight):** SVD matrix factorization on customer-service interaction matrix
-- **Urgency Scorer:** Gradient Boosting Regressor predicting service urgency (1-10 scale)
+## Model and data
 
-## Intended Use
+One-hot property/region features, clipped age scaling and configured flags feed cosine
+service-affinity relevance. Service centroids use highly rated training interactions.
+Iterative SVD completes missing ratings from smoothed priors without labeling unobserved
+entries explicit dislikes. Bounded content and rating/5 signals combine using
+validation-selected weights. Cold-start ranking uses profile affinity. Eligibility
+rules apply before ranking output; repeat visits remain eligible for recurring services.
 
-### Primary Use Cases
-- Recommend pest control services to existing TORCO customers
-- Provide cold-start recommendations for new customers
-- Prioritize services based on urgency and seasonality
+Gradient boosting learns noisy hand-authored priority labels from service, property,
+region, season, building age and elapsed time. Its output is a simulation estimate
+bounded 1–10, separate from relevance. The rule baseline knows the simulator and may
+outperform the learned estimator. No calibrated uncertainty is claimed.
 
-### Out-of-Scope Uses
-- Real-time pest detection or identification
-- Emergency response coordination
-- Financial risk assessment
+The dataset contains 500 synthetic static property profiles, 3,000 completed simulated
+visits and ten illustrative services. Default combined data: 375 Tucson, 125 Ohio.
+Names/emails are absent. See the data card and regional assumptions for provenance.
 
-## Data
+## Evaluation
 
-### Training Data
-- **Customers:** 500 synthetic Tucson customers with property profiles
-- **Interactions:** 3000 customer-service interactions with ratings (1-5)
-- **Services:** 10 pest control services with pricing and categories
-- **Time Period:** Multi-year historical data with seasonal patterns
+See `reports/evaluation.json` and `docs/evaluation.md` for actual verified measurements.
+The old 96.2% Precision@5 and 0.867 RMSE claims are withdrawn as current-model evidence.
 
-### Data Sources
-- Synthetic data generated using Faker library
-- Realistic Tucson ZIP codes and property types
-- Seasonally-adjusted interaction patterns (termite peaks in spring/summer)
+Twenty percent of customers are excluded from all fitting and tuning. Warm-customer
+bookings are split globally by date, with complete-date boundaries, into approximately
+60/20/20 training/validation/test windows. Only validation selects content weight/SVD
+rank. Train+validation then fits the final evaluation model. Warm test ranking and
+reserved cold-customer test-period ranking are distinct. Metrics include HitRate@5,
+Precision@5, Recall@5, binary NDCG@5 and catalog coverage. Popularity and hand-authored
+profile rules use the same eligibility policy. Urgency MAE/RMSE use held-out service
+events and compare gradient boosting, the noise-free generator rule and training mean.
 
-### Data Limitations
-- Synthetic data may not capture all real-world complexities
-- Limited to Tucson metropolitan area
-- No temporal trends beyond seasonal patterns
+Urgency evaluation conditions on the actual event's context, including prior visit gap;
+it is not a forecast made at the beginning of the ranking window. Ranking queries are
+frozen at the test-window start. Relevance labels are future bookings, not expert
+judgments. Future unbooked services are unobserved rather than proven irrelevant.
 
-## Performance
+## Limitations
 
-### Metrics
-- **Precision@5:** 96.2%
-- **RMSE (Urgency Prediction):** 0.867
-- **Coverage:** All 10 services can be recommended
+Synthetic labels and generator-correlated baselines constrain all conclusions. A tiny
+catalog inflates top-five hit rates; one seed/split supplies no uncertainty intervals.
+No real customer outcomes, measured lift, verified company prices or production traffic
+are available. Static building age does not track aging over the observation window.
+Location groupings are illustrative. Only coarse supported property categories are
+accepted publicly; unseen ZIPs return a limited-location explanation.
 
-### Evaluation Methodology
-- Holdout evaluation: Last interaction per customer as ground truth
-- 80/20 train/test split for urgency scorer
-- Cross-validation not performed due to small dataset
+## Operational and fairness considerations
 
-### Performance Limitations
-- Cold-start performance relies on profile features only
-- May not generalize to non-Tucson locations
-- Performance degrades with very sparse interaction data
+API keys are required; Sentry is opt-in and privacy-scrubbed. Coarse prediction features
+are logged without customer IDs, ZIPs, names or email, with rotation. Such logs still
+need restricted access and a retention policy for any real pilot. Drift diagnostics
+measure logged distribution changes, not accuracy or fairness. No sensitive-group
+fairness study, rate limiting, multi-user authorization or compliance certification
+has been performed. Property and location proxies require expert and governance review.
 
-## Ethical Considerations
-
-### Fairness
-- System may perpetuate biases in historical interaction data
-- Property type and location features could lead to discriminatory recommendations
-- No explicit fairness constraints implemented
-
-### Privacy
-- Stores customer property information and service history
-- No personally identifiable information beyond customer IDs
-- Model outputs do not include sensitive customer data
-
-### Safety
-- Recommendations are suggestions, not mandates
-- High urgency scores should not trigger automatic actions
-- Human oversight recommended for critical decisions
-
-## Recommendations
-
-### Monitoring
-- Monitor prediction drift using KS test and PSI metrics
-- Track recommendation acceptance rates
-- Validate performance on new customer segments
-
-### Maintenance
-- Retrain quarterly to capture seasonal patterns
-- Update service catalog as new offerings are added
-- Validate synthetic data assumptions against real data
-
-### Deployment
-- Deploy behind API with rate limiting
-- Implement A/B testing for recommendation changes
-- Maintain audit logs of all recommendations
-
-## Technical Details
-
-### Dependencies
-- Python 3.11+
-- scikit-learn 1.8.0
-- pandas 3.0.2
-- numpy 2.4.4
-- FastAPI 0.136.1
-
-### Hardware Requirements
-- CPU: 2+ cores recommended
-- RAM: 4GB minimum
-- Storage: 500MB for model and data
-
-### Model Size
-- Serialized model: ~50MB
-- Training time: ~30 seconds
-- Inference time: <100ms per recommendation
-
-## Contact Information
-
-For questions about this model:
-- Repository: [TORCO RecSys Project](https://github.com/torco/recsys)
-- Documentation: See project README.md
-- Issues: File GitHub issues for bugs or improvements
+Artifacts are trusted local joblib files, fingerprinted by data/config/code and relevant
+package/Python versions. No current model size, latency SLA or hardware minimum is
+claimed without a benchmark. Docker build and Azure deployment status are explicitly
+reported in deployment/validation documentation.

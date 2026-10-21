@@ -1,0 +1,37 @@
+{
+  "verified_date": "2026-10-21",
+  "platform": "Windows",
+  "python": "3.12.3",
+  "test_counts": {
+    "tests": 93,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "test_seconds": 52.303,
+  "coverage_line_rate": 0.8388,
+  "coverage_branch_rate": 0.7598,
+  "packages": {
+    "numpy": "2.4.4",
+    "pandas": "3.0.2",
+    "scikit-learn": "1.8.0",
+    "fastapi": "0.136.1",
+    "starlette": "0.52.1",
+    "anyio": "4.12.1",
+    "uvicorn": "0.52.0",
+    "mcp": "1.30.0",
+    "streamlit": "1.66.0",
+    "pytest": "9.1.1",
+    "ruff": "0.17.1",
+    "mypy": "2.4.0"
+  },
+  "full_data_reproducibility": "byte-identical CSVs and manifest",
+  "full_evaluation_reproducibility": "exact JSON match",
+  "artifact_api_smoke": "passed",
+  "notebook_code_cells_executed": 6,
+  "visual_review": "new and existing customers; screenshots saved",
+  "mcp": "actual SDK ClientSession over subprocess stdio to authenticated local HTTP; supported Selector/Popen fallback on restricted Windows runner",
+  "docker": "not built: engine unavailable",
+  "azure": "not deployed: external OIDC/resource configuration unavailable",
+  "remote_changes": "none; no commits or pushes made"
+}

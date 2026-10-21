@@ -1,0 +1,79 @@
+{
+  "customer_id": "C0001",
+  "customer_type": "existing",
+  "profile": {
+    "property_type": "commercial_office",
+    "zip_code": "85710",
+    "building_age_years": 36,
+    "region": "tucson",
+    "is_commercial": true,
+    "is_desert_adjacent": false,
+    "is_older_neighborhood": false,
+    "location_supported": true
+  },
+  "recommendations": [
+    {
+      "service_id": "S08",
+      "service_name": "Commercial Pest Management",
+      "category": "commercial",
+      "price_usd": 500.0,
+      "price_basis": "illustrative, not a quote",
+      "score": 0.8822,
+      "urgency_score": 5.2,
+      "urgency_label": "MEDIUM",
+      "explanation": "Based on similar commercial office profiles; building age 36 years. Priority considers summer and 180 days since service.",
+      "requires_assessment": true
+    },
+    {
+      "service_id": "S05",
+      "service_name": "Rodent Control Consultation",
+      "category": "rodent",
+      "price_usd": 200.0,
+      "price_basis": "illustrative, not a quote",
+      "score": 0.7202,
+      "urgency_score": 5.1,
+      "urgency_label": "MEDIUM",
+      "explanation": "Based on similar commercial office profiles; building age 36 years. Priority considers summer and 180 days since service.",
+      "requires_assessment": true
+    },
+    {
+      "service_id": "S10",
+      "service_name": "Priority Inspection Request",
+      "category": "emergency",
+      "price_usd": 250.0,
+      "price_basis": "illustrative, not a quote",
+      "score": 0.6933,
+      "urgency_score": 6.7,
+      "urgency_label": "MEDIUM",
+      "explanation": "Based on similar commercial office profiles; building age 36 years. Priority considers summer and 180 days since service.",
+      "requires_assessment": true
+    },
+    {
+      "service_id": "S07",
+      "service_name": "Ant & Cockroach Consultation",
+      "category": "ant_roach",
+      "price_usd": 130.0,
+      "price_basis": "illustrative, not a quote",
+      "score": 0.6875,
+      "urgency_score": 5.1,
+      "urgency_label": "MEDIUM",
+      "explanation": "Based on similar commercial office profiles; building age 36 years. Priority considers summer and 180 days since service.",
+      "requires_assessment": true
+    },
+    {
+      "service_id": "S03",
+      "service_name": "Termite Treatment Consultation",
+      "category": "termite",
+      "price_usd": 800.0,
+      "price_basis": "illustrative, not a quote",
+      "score": 0.6717,
+      "urgency_score": 8.6,
+      "urgency_label": "HIGH",
+      "explanation": "Based on similar commercial office profiles; building age 36 years. Priority considers summer and 180 days since service.",
+      "requires_assessment": true
+    }
+  ],
+  "model_version": "2.0.0",
+  "synthetic_data": true,
+  "disclaimer": "Independent, unofficial proof of concept using synthetic data. Prices are illustrative. Recommendations suggest staff follow-up, not confirmed infestations or required treatments. Urgency is a simulated priority estimate, not a professional assessment."
+}

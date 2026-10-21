@@ -1,0 +1,12 @@
+-r requirements-demo.in
+pytest
+pytest-cov
+ruff
+mypy
+pandas-stubs
+types-requests
+nbclient
+nbformat
+ipykernel
+matplotlib
+seaborn

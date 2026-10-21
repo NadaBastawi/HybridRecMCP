@@ -1,0 +1,4 @@
+# Normalize line endings across platforms, including bytes used in fingerprints.
+* text=auto eol=lf
+*.png binary
+*.pkl binary

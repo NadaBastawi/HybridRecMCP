@@ -1,195 +1,154 @@
-"""
-TORCO Pest Control — Recommendation API
-FastAPI service exposing the hybrid recommender
-"""
+"""FastAPI service for the independent synthetic-data proof of concept."""
+
+import hmac
 import logging
-import os
-import sys
-from typing import List, Optional
+from contextlib import asynccontextmanager
 
-import joblib
-import pandas as pd
-from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, Header, HTTPException
-from pydantic import BaseModel
-import sentry_sdk
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 
-from recommender import HybridRecommender
+from domain import DISCLAIMER, build_profile
+from monitoring.drift_detector import get_drift_report
 from monitoring.logger import PredictionLogger
-
-load_dotenv()
-
-sentry_sdk.init(
-    dsn="https://976a0582ae46c3a6817571521e4e2e98@o4511707022688256.ingest.de.sentry.io/4511707097006160",
-    send_default_pii=True,
-    traces_sample_rate=1.0,
-)
+from recommender import MODEL_VERSION, HybridRecommender
+from schemas import HealthResponse, NewCustomerRequest, RecommendRequest, RecommendResponse, Service
+from settings import Settings, scrub_sentry
+from train import artifact_metadata
 
 logger = logging.getLogger(__name__)
 
-# Configuration
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_DIR = os.getenv("MODEL_DIR", os.path.join(BASE_DIR, "models"))
-DATA_DIR = os.getenv("DATA_DIR", os.path.join(BASE_DIR, "data"))
-API_KEY = os.getenv("API_KEY", "")
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
-API_PORT = int(os.getenv("API_PORT", "8000"))
 
-logging.basicConfig(level=getattr(logging, LOG_LEVEL.upper(), logging.INFO), format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+def create_app(settings=None, model=None):
+    @asynccontextmanager
+    async def lifespan(app):
+        config = settings or Settings.from_env()
+        if config.sentry_dsn:
+            import sentry_sdk
 
-# Add model directory to path for imports
-if MODEL_DIR not in sys.path:
-    sys.path.append(MODEL_DIR)
-
-app = FastAPI(
-    title="TORCO Pest Control Recommendation API",
-    description="AI-powered service recommendations for pest control customers",
-    version="1.0.0"
-)
-
-# Model management
-class RecommenderManager:
-    """Manages the recommender model loading and access."""
-    
-    def __init__(self):
-        self._recommender = None
-        self._load_model()
-    
-    def _load_model(self):
-        """Load or train the recommender model."""
-        model_path = os.path.join(MODEL_DIR, "torco_recommender.pkl")
-        
+            sentry_sdk.init(
+                dsn=config.sentry_dsn,
+                send_default_pii=False,
+                traces_sample_rate=0.0,
+                include_local_variables=False,
+                before_send=scrub_sentry,
+            )
+        app.state.settings = config
+        app.state.model = (
+            model
+            if model is not None
+            else HybridRecommender.load(
+                config.model_dir / "torco_recommender.pkl", artifact_metadata(config.data_dir)
+            )
+        )
+        app.state.prediction_logger = PredictionLogger(config.log_dir)
         try:
-            if os.path.exists(model_path):
-                self._recommender = joblib.load(model_path)
-                logger.info("Loaded saved model")
-            else:
-                logger.info("Saved model not found. Training new model for API startup...")
-                customers = pd.read_csv(os.path.join(DATA_DIR, "customers.csv"))
-                interactions = pd.read_csv(os.path.join(DATA_DIR, "interactions.csv"))
-                services = pd.read_csv(os.path.join(DATA_DIR, "services.csv"))
-                self._recommender = HybridRecommender()
-                self._recommender.fit(customers, interactions, services)
-                os.makedirs(MODEL_DIR, exist_ok=True)
-                joblib.dump(self._recommender, model_path)
-                logger.info("Trained and saved new model")
-        except Exception as e:
-            logger.exception("Error loading or training model: %s", e)
-            raise
-    
-    @property
-    def recommender(self):
-        """Get the recommender instance."""
-        return self._recommender
+            yield
+        finally:
+            app.state.prediction_logger.close()
 
-# Initialize recommender manager
-recommender_manager = RecommenderManager()
-
-
-def require_api_key(x_api_key: Optional[str] = Header(default=None, alias="X-API-Key")):
-    """Ensure protected endpoints receive a valid API key."""
-    expected_key = API_KEY
-    if expected_key and x_api_key != expected_key:
-        raise HTTPException(status_code=401, detail="Invalid or missing API key")
-    if not expected_key and x_api_key is None:
-        return None
-    if x_api_key is None:
-        raise HTTPException(status_code=401, detail="Invalid or missing API key")
-    return None
-
-# ── SCHEMAS ───────────────────────────────────────────────────────────────────
-
-class RecommendRequest(BaseModel):
-    customer_id: str
-    season: Optional[str] = "summer"
-    days_since_last_service: Optional[int] = 180
-    top_n: Optional[int] = 5
-
-class NewCustomerRequest(BaseModel):
-    property_type: str          # e.g. "residential_house"
-    zip_code: str               # e.g. "85743"
-    building_age_years: int
-    season: Optional[str] = "summer"
-    days_since_last_service: Optional[int] = 365
-    top_n: Optional[int] = 5
-
-class ServiceRecommendation(BaseModel):
-    service_id: str
-    service_name: str
-    category: str
-    price_usd: float
-    score: float
-    urgency_score: float
-    urgency_label: str
-
-class RecommendResponse(BaseModel):
-    customer_id: str
-    recommendations: List[ServiceRecommendation]
-    model_version: str = "1.0.0"
-
-# ── ENDPOINTS ─────────────────────────────────────────────────────────────────
-
-@app.get("/")
-def root():
-    return {
-        "service": "TORCO Recommendation API",
-        "status": "running",
-        "endpoints": ["/recommend", "/recommend/new-customer", "/health", "/services"]
-    }
-
-@app.get("/health")
-def health():
-    return {"status": "ok", "model_loaded": recommender_manager.recommender is not None}
-
-@app.get("/services")
-def list_services():
-    return [dict(service_id=k, **v) for k, v in recommender_manager.recommender.services_dict.items()]
-
-@app.post("/recommend", response_model=RecommendResponse)
-def recommend_for_existing_customer(request: RecommendRequest, _=Depends(require_api_key)):
-    """
-    Get service recommendations for an existing customer by ID.
-    Uses their full history and profile for personalized recommendations.
-    """
-    if request.customer_id not in recommender_manager.recommender.customers_df.index:
-        raise HTTPException(status_code=404, detail=f"Customer {request.customer_id} not found")
-
-    recs = recommender_manager.recommender.recommend(
-        customer_id=request.customer_id,
-        top_n=request.top_n,
-        season=request.season,
-        days_since_last=request.days_since_last_service
+    app = FastAPI(
+        title="HybridRecMCP - Independent Demonstration",
+        version=MODEL_VERSION,
+        description=DISCLAIMER,
+        lifespan=lifespan,
     )
 
-    return RecommendResponse(
-        customer_id=request.customer_id,
-        recommendations=[ServiceRecommendation(**r) for r in recs]
-    )
+    def require_api_key(
+        request: Request, x_api_key: str | None = Header(default=None, alias="X-API-Key")
+    ):
+        if x_api_key is None or not hmac.compare_digest(
+            x_api_key.encode(), request.app.state.settings.api_key.encode()
+        ):
+            raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
-@app.post("/recommend/new-customer")
-def recommend_for_new_customer(request: NewCustomerRequest, _=Depends(require_api_key)):
-    """
-    Get recommendations for a new customer with no history.
-    Falls back to content-based filtering using property profile.
-    Cold-start solution using property features only.
-    """
-    recs = recommender_manager.recommender.recommend_cold_start(
-        property_type=request.property_type,
-        zip_code=request.zip_code,
-        building_age_years=request.building_age_years,
-        season=request.season,
-        days_since_last=request.days_since_last_service,
-        top_n=request.top_n
-    )
+    def record(request, recs, profile, season, days):
+        context = {**profile, "season": season, "days_since_last_service": days}
+        try:
+            for rec in recs:
+                request.app.state.prediction_logger.log_prediction(
+                    None, rec["service_id"], rec["score"], rec["urgency_score"], context
+                )
+        except OSError:
+            logger.warning("Prediction telemetry write failed")
 
-    return {
-        "customer_type": "new",
-        "profile": {
-            "property_type": request.property_type,
-            "zip_code": request.zip_code,
-            "building_age_years": request.building_age_years,
-            "season": request.season,
-            "days_since_last_service": request.days_since_last_service,
-        },
-        "recommendations": recs,
-    }
+    @app.get("/")
+    def root():
+        return dict(
+            service="HybridRecMCP",
+            disclaimer=DISCLAIMER,
+            endpoints=[
+                "/recommend",
+                "/recommend/new-customer",
+                "/services",
+                "/health",
+                "/monitoring",
+            ],
+        )
+
+    @app.get("/health", response_model=HealthResponse)
+    def health(request: Request):
+        ready = getattr(request.app.state, "model", None) is not None
+        if not ready:
+            raise HTTPException(503, "Model unavailable")
+        return dict(status="ok", model_loaded=ready, model_version=MODEL_VERSION)
+
+    @app.get("/services", response_model=list[Service], dependencies=[Depends(require_api_key)])
+    def services(request: Request):
+        return [
+            dict(service_id=sid, **info)
+            for sid, info in request.app.state.model.services_dict.items()
+        ]
+
+    @app.get("/monitoring", dependencies=[Depends(require_api_key)])
+    def monitoring(request: Request):
+        return get_drift_report(request.app.state.prediction_logger.get_recent_logs())
+
+    @app.post(
+        "/recommend", response_model=RecommendResponse, dependencies=[Depends(require_api_key)]
+    )
+    def recommend(payload: RecommendRequest, request: Request):
+        engine = request.app.state.model
+        if payload.customer_id not in engine.customers_df.index:
+            raise HTTPException(404, "Customer not found")
+        profile = engine.customers_df.loc[payload.customer_id].to_dict()
+        recs = engine.recommend(
+            payload.customer_id, payload.top_n, payload.season, payload.days_since_last_service
+        )
+        record(request, recs, profile, payload.season, payload.days_since_last_service)
+        safe_profile = build_profile(
+            profile["property_type"],
+            str(profile["zip_code"]),
+            int(profile["building_age_years"]),
+            profile["region"],
+        )
+        return RecommendResponse(
+            customer_id=payload.customer_id,
+            customer_type="existing",
+            profile=safe_profile,
+            recommendations=recs,
+        )
+
+    @app.post(
+        "/recommend/new-customer",
+        response_model=RecommendResponse,
+        dependencies=[Depends(require_api_key)],
+    )
+    def recommend_new(payload: NewCustomerRequest, request: Request):
+        profile = build_profile(
+            payload.property_type, payload.zip_code, payload.building_age_years, payload.region
+        )
+        recs = request.app.state.model.recommend_cold_start(
+            payload.property_type,
+            payload.zip_code,
+            payload.building_age_years,
+            payload.season,
+            payload.days_since_last_service,
+            payload.top_n,
+            payload.region,
+        )
+        record(request, recs, profile, payload.season, payload.days_since_last_service)
+        return RecommendResponse(customer_type="new", profile=profile, recommendations=recs)
+
+    return app
+
+
+app = create_app()

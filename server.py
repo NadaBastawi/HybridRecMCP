@@ -1,206 +1,122 @@
-"""
-TORCO Pest Control — MCP Server
-Exposes the recommendation engine as an MCP tool so AI agents
-can query it in natural language.
+"""Official MCP SDK stdio bridge to the authenticated recommendation API."""
 
-An agent can ask:
-  "What services should I recommend for customer C0001?"
-  "What does a new residential customer in desert Tucson need most?"
-  "Which customers have HIGH urgency this summer?"
-"""
+import os
+from urllib.parse import urlparse
 
-import json
-import sys
-import asyncio
 import httpx
-from typing import Any
+from dotenv import load_dotenv
+from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp.exceptions import ToolError
 
-# MCP server implementation using stdio transport
-# Compatible with Claude Desktop, Continue, and any MCP client
+from domain import DISCLAIMER, ROOT
+from schemas import (
+    Days,
+    NewCustomerRequest,
+    PropertyType,
+    RecommendRequest,
+    RecommendResponse,
+    Region,
+    Season,
+    Service,
+    TopN,
+)
 
-TOOLS = [
-    {
-        "name": "recommend_for_customer",
-        "description": (
-            "Get personalized pest control service recommendations for an existing TORCO customer. "
-            "Returns top services ranked by recommendation score and urgency. "
-            "Use this when you know the customer ID."
-        ),
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "customer_id": {
-                    "type": "string",
-                    "description": "The customer ID (e.g. C0001, C0042)"
-                },
-                "season": {
-                    "type": "string",
-                    "enum": ["spring", "summer", "fall", "winter"],
-                    "description": "Current season — affects urgency scoring"
-                },
-                "days_since_last_service": {
-                    "type": "integer",
-                    "description": "Days since this customer's last service visit"
-                },
-                "top_n": {
-                    "type": "integer",
-                    "description": "Number of recommendations to return (default 5)"
-                }
-            },
-            "required": ["customer_id"]
-        }
-    },
-    {
-        "name": "recommend_for_new_customer",
-        "description": (
-            "Get pest control service recommendations for a NEW customer with no history. "
-            "Uses property profile for cold-start recommendations. "
-            "Use this when onboarding a new customer."
-        ),
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "property_type": {
-                    "type": "string",
-                    "enum": ["residential_house", "residential_apartment", "commercial_restaurant",
-                             "commercial_office", "commercial_warehouse", "mobile_home"],
-                    "description": "Type of property"
-                },
-                "zip_code": {
-                    "type": "string",
-                    "description": "Tucson ZIP code (e.g. 85743)"
-                },
-                "building_age_years": {
-                    "type": "integer",
-                    "description": "Age of the building in years"
-                },
-                "season": {
-                    "type": "string",
-                    "enum": ["spring", "summer", "fall", "winter"],
-                    "description": "Current season"
-                }
-            },
-            "required": ["property_type", "zip_code", "building_age_years"]
-        }
-    },
-    {
-        "name": "list_services",
-        "description": "List all available TORCO pest control services with pricing.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {}
-        }
-    }
-]
 
-API_BASE = "http://localhost:8000"
+def create_mcp_server(api_base=None, api_key=None, transport=None):
+    load_dotenv(ROOT / ".env", override=False)
+    base = (api_base or os.getenv("API_BASE", "http://127.0.0.1:8000")).rstrip("/")
+    parsed = urlparse(base)
+    if (
+        parsed.scheme not in ("http", "https")
+        or not parsed.hostname
+        or parsed.username
+        or parsed.password
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ValueError("API_BASE must be a valid HTTP(S) service URL")
+    if parsed.scheme == "http" and parsed.hostname not in ("127.0.0.1", "localhost", "::1"):
+        raise ValueError("Remote API_BASE must use HTTPS")
+    key = api_key if api_key is not None else os.getenv("API_KEY", "")
+    mcp = FastMCP("HybridRecMCP", instructions=DISCLAIMER)
 
-async def call_tool(name: str, arguments: dict) -> str:
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    async def call(method, path, payload=None):
+        if len(key) < 16:
+            raise ToolError("Configure API_KEY with the same secret used by the API")
         try:
-            if name == "recommend_for_customer":
-                resp = await client.post(f"{API_BASE}/recommend", json=arguments)
-                data = resp.json()
-                lines = [f"Recommendations for {data['customer_id']}:\n"]
-                for i, r in enumerate(data["recommendations"], 1):
-                    lines.append(
-                        f"{i}. {r['service_name']} — ${r['price_usd']}\n"
-                        f"   Score: {r['recommendation_score']} | "
-                        f"Urgency: {r['urgency_score']}/10 [{r['urgency_label']}]"
-                    )
-                return "\n".join(lines)
+            async with httpx.AsyncClient(
+                base_url=base, headers={"X-API-Key": key}, timeout=15, transport=transport
+            ) as client:
+                response = await client.request(method, path, json=payload)
+                response.raise_for_status()
+                data = response.json()
+                if path == "/services":
+                    return [Service.model_validate(item).model_dump() for item in data]
+                return RecommendResponse.model_validate(data).model_dump()
+        except httpx.HTTPStatusError as exc:
+            status = exc.response.status_code
+            message = {
+                401: "API authentication failed",
+                404: "Customer not found",
+                422: "Invalid recommendation inputs",
+            }.get(status, "Recommendation API failed")
+            raise ToolError(message) from None
+        except httpx.RequestError:
+            raise ToolError(
+                "Recommendation API is unavailable; check API_BASE and the API process"
+            ) from None
+        except (ValueError, TypeError):
+            raise ToolError("Recommendation API returned an invalid response") from None
 
-            elif name == "recommend_for_new_customer":
-                resp = await client.post(f"{API_BASE}/recommend/new-customer", json=arguments)
-                data = resp.json()
-                lines = [f"Cold-start recommendations (new customer):\n",
-                         f"Profile: {data['profile']['property_type']} | ZIP {data['profile']['zip_code']}\n"]
-                for i, r in enumerate(data["recommendations"], 1):
-                    lines.append(
-                        f"{i}. {r['service_name']} — ${r['price_usd']}\n"
-                        f"   Urgency: {r['urgency_score']}/10 [{r['urgency_label']}]"
-                    )
-                return "\n".join(lines)
+    @mcp.tool()
+    async def recommend_for_customer(
+        customer_id: str,
+        season: Season = "summer",
+        days_since_last_service: Days = 180,
+        top_n: TopN = 5,
+    ) -> dict:
+        """Suggest services for an existing synthetic customer; scores and prices are demonstrative."""
+        payload = RecommendRequest(
+            customer_id=customer_id,
+            season=season,
+            days_since_last_service=days_since_last_service,
+            top_n=top_n,
+        )
+        return await call("POST", "/recommend", payload.model_dump())
 
-            elif name == "list_services":
-                resp = await client.get(f"{API_BASE}/services")
-                data = resp.json()
-                lines = ["Available TORCO Services:\n"]
-                for sid, info in data["services"].items():
-                    lines.append(f"  {sid}: {info['service_name']} — ${info['price_usd']} ({info['category']})")
-                return "\n".join(lines)
+    @mcp.tool()
+    async def recommend_for_new_customer(
+        property_type: PropertyType,
+        zip_code: str,
+        building_age_years: int,
+        season: Season = "summer",
+        region: Region = "tucson",
+        days_since_last_service: Days | None = 365,
+        top_n: TopN = 5,
+    ) -> dict:
+        """Suggest relevant services for a new property, with separate simulated priority and illustrative prices."""
+        payload = NewCustomerRequest(
+            property_type=property_type,
+            zip_code=zip_code,
+            building_age_years=building_age_years,
+            season=season,
+            region=region,
+            days_since_last_service=days_since_last_service,
+            top_n=top_n,
+        )
+        return await call("POST", "/recommend/new-customer", payload.model_dump())
 
-            else:
-                return f"Unknown tool: {name}"
+    @mcp.tool()
+    async def list_services() -> dict:
+        """List the illustrative service catalog, suitability flags and prices; these are not company quotes."""
+        return dict(
+            services=await call("GET", "/services"), synthetic_data=True, disclaimer=DISCLAIMER
+        )
 
-        except Exception as e:
-            return f"Error calling API: {str(e)}. Make sure the FastAPI server is running on port 8000."
-
-
-async def handle_message(message: dict) -> dict | None:
-    method = message.get("method")
-    msg_id = message.get("id")
-
-    if method == "initialize":
-        return {
-            "jsonrpc": "2.0", "id": msg_id,
-            "result": {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {"tools": {}},
-                "serverInfo": {"name": "torco-recsys-mcp", "version": "1.0.0"}
-            }
-        }
-
-    elif method == "tools/list":
-        return {
-            "jsonrpc": "2.0", "id": msg_id,
-            "result": {"tools": TOOLS}
-        }
-
-    elif method == "tools/call":
-        params = message.get("params", {})
-        tool_name = params.get("name")
-        arguments = params.get("arguments", {})
-        result_text = await call_tool(tool_name, arguments)
-        return {
-            "jsonrpc": "2.0", "id": msg_id,
-            "result": {
-                "content": [{"type": "text", "text": result_text}],
-                "isError": False
-            }
-        }
-
-    elif method == "notifications/initialized":
-        return None
-
-    return {
-        "jsonrpc": "2.0", "id": msg_id,
-        "error": {"code": -32601, "message": f"Method not found: {method}"}
-    }
+    return mcp
 
 
-async def main():
-    """Run MCP server over stdio"""
-    while True:
-        line = await asyncio.get_event_loop().run_in_executor(None, sys.stdin.readline)
-        if not line:
-            break
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            message = json.loads(line)
-            response = await handle_message(message)
-            if response is not None:
-                print(json.dumps(response), flush=True)
-        except json.JSONDecodeError:
-            pass
-        except Exception as e:
-            print(json.dumps({
-                "jsonrpc": "2.0", "id": None,
-                "error": {"code": -32603, "message": str(e)}
-            }), flush=True)
-
+mcp = create_mcp_server()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    mcp.run(transport="stdio")

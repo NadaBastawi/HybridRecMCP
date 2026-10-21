@@ -1,0 +1,2 @@
+# FastAPI/MCP and Docker runtime; does not install the Streamlit presentation.
+-r requirements.lock

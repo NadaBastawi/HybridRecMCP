@@ -1,0 +1,29 @@
+{
+  "python": "3.12.3",
+  "checks": [
+    {
+      "mode": "cold",
+      "initialization_seconds": 7.011,
+      "cached_rerun_seconds": 0.03,
+      "peak_memory_mib": 193.98,
+      "artifact_bytes": 404603,
+      "verified": true
+    },
+    {
+      "mode": "warm",
+      "initialization_seconds": 5.194,
+      "cached_rerun_seconds": 0.043,
+      "peak_memory_mib": 188.63,
+      "artifact_bytes": 404603,
+      "verified": true
+    },
+    {
+      "mode": "invalid",
+      "initialization_seconds": 6.363,
+      "cached_rerun_seconds": 0.066,
+      "peak_memory_mib": 193.07,
+      "artifact_bytes": 404603,
+      "verified": true
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "tucson": {
+    "label": "Tucson, Arizona",
+    "zip_prefixes": ["857"],
+    "example_zips": ["85701", "85704", "85706", "85710", "85718", "85743"],
+    "scorpion_scenario_zips": ["85743", "85718", "85704"],
+    "termite_peak_seasons": ["spring", "summer"],
+    "scorpion_enabled": true,
+    "note": "Illustrative ZIP grouping and seasonal weights; not measured infestation rates or company service territory."
+  },
+  "ohio": {
+    "label": "Ohio demonstration",
+    "zip_prefixes": ["43", "44", "45"],
+    "example_zips": ["43215", "44113", "45202", "45402"],
+    "scorpion_scenario_zips": [],
+    "termite_peak_seasons": ["spring"],
+    "scorpion_enabled": false,
+    "note": "Independent illustrative Ohio scenario; not a statement about TORCO ownership, territory or actual customer needs."
+  }
+}

@@ -1,0 +1,290 @@
+{
+  "schema_version": 2,
+  "seed": 42,
+  "synthetic_data": true,
+  "data_fingerprint": "10c6296771e13f728078e64c3863422d026ee5614e9ffa8851d8cf4f9c019193",
+  "protocol": "Global date 60/20/20 split, cold customers excluded from every fit; frozen query per customer; repeat bookings allowed.",
+  "relevance": "Any distinct completed booked service in the future window, regardless of rating; not expert relevance labels.",
+  "splits": {
+    "train": 1478,
+    "validation": 470,
+    "test": 452,
+    "cold_customers_reserved": 100,
+    "cold_test": 104,
+    "train_end": "2024-10-14",
+    "validation_start": "2024-10-15",
+    "validation_end": "2025-05-20",
+    "test_start": "2025-05-21"
+  },
+  "selected": {
+    "cb_weight": 1.0,
+    "cf_weight": 0.0,
+    "svd_components": 2
+  },
+  "validation_candidates": [
+    {
+      "cb_weight": 0.0,
+      "svd_components": 2,
+      "hit_rate@5": 0.667785,
+      "precision@5": 0.160403,
+      "recall@5": 0.551454,
+      "ndcg@5": 0.386465,
+      "customers": 298,
+      "heldout_interactions": 467,
+      "skipped_customers_without_history": 1,
+      "catalog_coverage": 1.0,
+      "recommended_services": 10,
+      "catalog_size": 10,
+      "as_of": "2024-10-15"
+    },
+    {
+      "cb_weight": 0.4,
+      "svd_components": 2,
+      "hit_rate@5": 0.741611,
+      "precision@5": 0.181208,
+      "recall@5": 0.635347,
+      "ndcg@5": 0.435366,
+      "customers": 298,
+      "heldout_interactions": 467,
+      "skipped_customers_without_history": 1,
+      "catalog_coverage": 1.0,
+      "recommended_services": 10,
+      "catalog_size": 10,
+      "as_of": "2024-10-15"
+    },
+    {
+      "cb_weight": 0.7,
+      "svd_components": 2,
+      "hit_rate@5": 0.785235,
+      "precision@5": 0.19396,
+      "recall@5": 0.678971,
+      "ndcg@5": 0.464666,
+      "customers": 298,
+      "heldout_interactions": 467,
+      "skipped_customers_without_history": 1,
+      "catalog_coverage": 1.0,
+      "recommended_services": 10,
+      "catalog_size": 10,
+      "as_of": "2024-10-15"
+    },
+    {
+      "cb_weight": 1.0,
+      "svd_components": 2,
+      "hit_rate@5": 0.798658,
+      "precision@5": 0.2,
+      "recall@5": 0.699105,
+      "ndcg@5": 0.464898,
+      "customers": 298,
+      "heldout_interactions": 467,
+      "skipped_customers_without_history": 1,
+      "catalog_coverage": 1.0,
+      "recommended_services": 10,
+      "catalog_size": 10,
+      "as_of": "2024-10-15"
+    },
+    {
+      "cb_weight": 0.0,
+      "svd_components": 3,
+      "hit_rate@5": 0.694631,
+      "precision@5": 0.159732,
+      "recall@5": 0.545302,
+      "ndcg@5": 0.376206,
+      "customers": 298,
+      "heldout_interactions": 467,
+      "skipped_customers_without_history": 1,
+      "catalog_coverage": 1.0,
+      "recommended_services": 10,
+      "catalog_size": 10,
+      "as_of": "2024-10-15"
+    },
+    {
+      "cb_weight": 0.4,
+      "svd_components": 3,
+      "hit_rate@5": 0.744966,
+      "precision@5": 0.177852,
+      "recall@5": 0.60962,
+      "ndcg@5": 0.424226,
+      "customers": 298,
+      "heldout_interactions": 467,
+      "skipped_customers_without_history": 1,
+      "catalog_coverage": 1.0,
+      "recommended_services": 10,
+      "catalog_size": 10,
+      "as_of": "2024-10-15"
+    },
+    {
+      "cb_weight": 0.7,
+      "svd_components": 3,
+      "hit_rate@5": 0.778523,
+      "precision@5": 0.191275,
+      "recall@5": 0.662752,
+      "ndcg@5": 0.454796,
+      "customers": 298,
+      "heldout_interactions": 467,
+      "skipped_customers_without_history": 1,
+      "catalog_coverage": 1.0,
+      "recommended_services": 10,
+      "catalog_size": 10,
+      "as_of": "2024-10-15"
+    },
+    {
+      "cb_weight": 1.0,
+      "svd_components": 3,
+      "hit_rate@5": 0.798658,
+      "precision@5": 0.2,
+      "recall@5": 0.699105,
+      "ndcg@5": 0.464898,
+      "customers": 298,
+      "heldout_interactions": 467,
+      "skipped_customers_without_history": 1,
+      "catalog_coverage": 1.0,
+      "recommended_services": 10,
+      "catalog_size": 10,
+      "as_of": "2024-10-15"
+    }
+  ],
+  "warm": {
+    "hybrid": {
+      "hit_rate@5": 0.808725,
+      "precision@5": 0.200671,
+      "recall@5": 0.720917,
+      "ndcg@5": 0.470399,
+      "customers": 298,
+      "heldout_interactions": 452,
+      "skipped_customers_without_history": 0,
+      "catalog_coverage": 1.0,
+      "recommended_services": 10,
+      "catalog_size": 10,
+      "as_of": "2025-05-21"
+    },
+    "default_40_60": {
+      "hit_rate@5": 0.761745,
+      "precision@5": 0.183221,
+      "recall@5": 0.654362,
+      "ndcg@5": 0.444662,
+      "customers": 298,
+      "heldout_interactions": 452,
+      "skipped_customers_without_history": 0,
+      "catalog_coverage": 1.0,
+      "recommended_services": 10,
+      "catalog_size": 10,
+      "as_of": "2025-05-21"
+    },
+    "collaborative": {
+      "hit_rate@5": 0.691275,
+      "precision@5": 0.161074,
+      "recall@5": 0.576063,
+      "ndcg@5": 0.391975,
+      "customers": 298,
+      "heldout_interactions": 452,
+      "skipped_customers_without_history": 0,
+      "catalog_coverage": 1.0,
+      "recommended_services": 10,
+      "catalog_size": 10,
+      "as_of": "2025-05-21"
+    },
+    "content": {
+      "hit_rate@5": 0.808725,
+      "precision@5": 0.200671,
+      "recall@5": 0.720917,
+      "ndcg@5": 0.470399,
+      "customers": 298,
+      "heldout_interactions": 452,
+      "skipped_customers_without_history": 0,
+      "catalog_coverage": 1.0,
+      "recommended_services": 10,
+      "catalog_size": 10,
+      "as_of": "2025-05-21"
+    },
+    "popularity": {
+      "hit_rate@5": 0.808725,
+      "precision@5": 0.205369,
+      "recall@5": 0.717002,
+      "ndcg@5": 0.492085,
+      "customers": 298,
+      "heldout_interactions": 452,
+      "skipped_customers_without_history": 0,
+      "catalog_coverage": 0.5,
+      "recommended_services": 5,
+      "catalog_size": 10,
+      "as_of": "2025-05-21"
+    },
+    "profile_rule": {
+      "hit_rate@5": 0.85906,
+      "precision@5": 0.224161,
+      "recall@5": 0.789709,
+      "ndcg@5": 0.552145,
+      "customers": 298,
+      "heldout_interactions": 452,
+      "skipped_customers_without_history": 0,
+      "catalog_coverage": 0.9,
+      "recommended_services": 9,
+      "catalog_size": 10,
+      "as_of": "2025-05-21"
+    }
+  },
+  "cold": {
+    "content": {
+      "hit_rate@5": 0.776119,
+      "precision@5": 0.2,
+      "recall@5": 0.701493,
+      "ndcg@5": 0.457826,
+      "customers": 67,
+      "heldout_interactions": 104,
+      "skipped_customers_without_history": 0,
+      "catalog_coverage": 1.0,
+      "recommended_services": 10,
+      "catalog_size": 10,
+      "as_of": "2025-05-21"
+    },
+    "popularity": {
+      "hit_rate@5": 0.776119,
+      "precision@5": 0.20597,
+      "recall@5": 0.706468,
+      "ndcg@5": 0.490486,
+      "customers": 67,
+      "heldout_interactions": 104,
+      "skipped_customers_without_history": 0,
+      "catalog_coverage": 0.5,
+      "recommended_services": 5,
+      "catalog_size": 10,
+      "as_of": "2025-05-21"
+    },
+    "profile_rule": {
+      "hit_rate@5": 0.835821,
+      "precision@5": 0.223881,
+      "recall@5": 0.781095,
+      "ndcg@5": 0.542918,
+      "customers": 67,
+      "heldout_interactions": 104,
+      "skipped_customers_without_history": 0,
+      "catalog_coverage": 0.9,
+      "recommended_services": 9,
+      "catalog_size": 10,
+      "as_of": "2025-05-21"
+    }
+  },
+  "urgency": {
+    "test_interactions": 452,
+    "gradient_boosting": {
+      "mae": 0.750775,
+      "rmse": 0.869926
+    },
+    "rule_baseline": {
+      "mae": 0.681416,
+      "rmse": 0.825479
+    },
+    "training_mean": {
+      "mae": 1.201773,
+      "rmse": 1.487074
+    }
+  },
+  "limitations": [
+    "Synthetic data only; no evidence of real customer benefit.",
+    "Profile and urgency rule baselines share simulator assumptions and have privileged knowledge.",
+    "Only ten services; top-five hit rate is inherently generous.",
+    "Unbooked services are unobserved, not confirmed irrelevant.",
+    "No causal lift, calibrated confidence, or professional pest-risk validation.",
+    "One fixed split and seed; uncertainty intervals and broader stability studies remain future work."
+  ]
+}
